@@ -13,10 +13,13 @@ import {
   ShieldCheck,
   ShieldAlert,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ currentTab, onSelectTab }) {
+  const { role, isViewer } = useAuth();
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'ai', label: 'AI Assistant', icon: Sparkles, badge: 'AI' },
@@ -75,8 +78,29 @@ export default function Sidebar({ currentTab, onSelectTab }) {
         })}
       </div>
 
-      {/* ISO / Chain-of-Custody Certification Block */}
+      {/* ISO & RBAC Session Block */}
       <div className="px-4 pt-4 border-t border-slate-800/80 space-y-2">
+        {/* Role Access Indicator */}
+        <div className={`p-2.5 rounded-xl border text-[11px] font-mono ${
+          role === 'Admin'
+            ? 'bg-purple-950/40 border-purple-500/40 text-purple-300'
+            : isViewer
+            ? 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+            : 'bg-cyan-950/40 border-cyan-500/40 text-cyan-300'
+        }`}>
+          <div className="flex items-center justify-between font-bold">
+            <span>ROLE: {role.toUpperCase()}</span>
+            {isViewer ? <Lock className="w-3 h-3 text-amber-400" /> : <ShieldCheck className="w-3 h-3 text-cyan-400" />}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-1 leading-tight">
+            {isViewer
+              ? 'Read-Only: Evidence upload & case mutations disabled'
+              : role === 'Admin'
+              ? 'Full Administrator Clearance'
+              : 'DFIR Examiner Clearance'}
+          </p>
+        </div>
+
         <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-400 space-y-1">
           <div className="flex items-center gap-1.5 text-cyan-400 font-semibold">
             <ShieldCheck className="w-3.5 h-3.5" />

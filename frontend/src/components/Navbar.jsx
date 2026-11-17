@@ -9,13 +9,20 @@ import {
   ChevronDown,
   AlertOctagon,
   CheckCircle2,
-  X
+  X,
+  LogOut,
+  Key,
+  ShieldCheck,
+  Eye
 } from 'lucide-react';
 import StatusBadge from './StatusBadge';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar({ activeCase, cases, onSelectCase }) {
+  const { user, role, logout } = useAuth();
   const [currentTime, setCurrentTime] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     const updateTime = () => {
@@ -120,17 +127,99 @@ export default function Navbar({ activeCase, cases, onSelectCase }) {
           )}
         </div>
 
-        {/* User Identity Profile Badge */}
-        <div className="flex items-center gap-2.5 pl-2 border-l border-slate-800">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 p-[1px]">
-            <div className="w-full h-full bg-slate-950 rounded-xl flex items-center justify-center text-cyan-400 text-xs font-bold font-mono">
-              FE
+        {/* User Identity Profile Badge & Dropdown */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setProfileOpen(!profileOpen)}
+            className="flex items-center gap-2.5 pl-2 py-1 border-l border-slate-800 hover:opacity-90 transition-opacity text-left cursor-pointer"
+          >
+            <div className={`w-8 h-8 rounded-xl p-[1px] ${
+              role === 'Admin'
+                ? 'bg-gradient-to-tr from-purple-500 to-indigo-600'
+                : role === 'Viewer'
+                ? 'bg-gradient-to-tr from-amber-500 to-yellow-600'
+                : 'bg-gradient-to-tr from-cyan-500 to-blue-600'
+            }`}>
+              <div className="w-full h-full bg-slate-950 rounded-xl flex items-center justify-center text-xs font-bold font-mono text-cyan-300 uppercase">
+                {user?.username ? user.username.slice(0, 2) : 'FE'}
+              </div>
             </div>
-          </div>
-          <div className="hidden xl:block text-left text-xs">
-            <p className="font-semibold text-slate-200">Forensic Examiner</p>
-            <p className="text-[10px] text-slate-500 font-mono">Tier-3 DFIR Specialist</p>
-          </div>
+            <div className="hidden xl:block text-left text-xs">
+              <p className="font-semibold text-slate-200 truncate max-w-[120px]">
+                {user?.full_name || user?.username || 'Forensic Examiner'}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border ${
+                  role === 'Admin'
+                    ? 'border-purple-500/40 text-purple-300 bg-purple-950/60'
+                    : role === 'Viewer'
+                    ? 'border-amber-500/40 text-amber-300 bg-amber-950/60'
+                    : 'border-cyan-500/40 text-cyan-300 bg-cyan-950/60'
+                }`}>
+                  {role || 'Investigator'}
+                </span>
+              </div>
+            </div>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-500 hidden xl:block" />
+          </button>
+
+          {/* User Profile Menu Dropdown */}
+          {profileOpen && (
+            <div className="absolute right-0 mt-2 w-72 bg-[#0b1329] border border-slate-800 rounded-xl shadow-2xl p-4 text-xs z-50 animate-fadeIn">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-950 border border-cyan-500/40 flex items-center justify-center font-mono text-cyan-300 font-bold uppercase">
+                    {user?.username ? user.username.slice(0, 2) : 'FE'}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-white truncate max-w-[170px]">
+                      {user?.full_name || 'Forensic Examiner'}
+                    </p>
+                    <p className="text-[11px] text-slate-400 font-mono truncate max-w-[170px]">
+                      @{user?.username || 'examiner'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen(false)}
+                  className="text-slate-500 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="py-2.5 space-y-1.5 text-slate-300 font-mono text-[11px]">
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-500">Official Email:</span>
+                  <span className="text-slate-300 truncate max-w-[140px]">{user?.email || 'examiner@cybertrace.local'}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-800/60">
+                  <span className="text-slate-500">Security Clearance:</span>
+                  <span className="text-cyan-400 font-semibold">{role || 'Investigator'}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-500">Authentication Mode:</span>
+                  <span className="text-emerald-400">JWT Token Active</span>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileOpen(false);
+                    logout();
+                  }}
+                  className="w-full py-2 px-3 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-500/40 text-red-300 font-mono text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Terminate Session (Sign Out)
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

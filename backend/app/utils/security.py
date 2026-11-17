@@ -86,3 +86,18 @@ def decode_access_token(token: str) -> dict:
     except Exception as e:
         raise ValueError(f"Invalid access token: {str(e)}")
 
+def create_password_reset_token(identity: str, expires_minutes: int = 15) -> str:
+    """Create a signed, short-lived JWT specifically for password recovery."""
+    return create_access_token(
+        {"sub": identity, "purpose": "password_reset"},
+        expires_delta=timedelta(minutes=expires_minutes)
+    )
+
+def decode_password_reset_token(token: str) -> dict:
+    """Validate token and ensure it is designated strictly for password reset."""
+    payload = decode_access_token(token)
+    if payload.get("purpose") != "password_reset":
+        raise ValueError("Token is not valid for password reset operations.")
+    return payload
+
+

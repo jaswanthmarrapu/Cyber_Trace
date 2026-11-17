@@ -13,9 +13,32 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Attach JWT Bearer Token to all outgoing requests
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('cybertrace_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || '';
+
+    // Handle 401 Unauthorized (ignore for login/register/forgot-password attempts)
+    if (status === 401 && !url.includes('/auth/login') && !url.includes('/auth/register') && !url.includes('/auth/forgot-password')) {
+      console.warn('[CyberTrace Auth]: Session expired or unauthorized. Clearing credentials.');
+      localStorage.removeItem('cybertrace_token');
+      localStorage.removeItem('cybertrace_user');
+      window.dispatchEvent(new Event('cybertrace-unauthorized'));
+    }
+
     const errorMsg =
       error.response?.data?.detail ||
       error.response?.data?.message ||

@@ -83,6 +83,14 @@ from app.forensic.report_generator import (
     generate_complete_investigation_report_pdf,
     query_case_report_dossier
 )
+from app.utils.security import (
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_password_reset_token,
+    decode_password_reset_token,
+    decode_access_token
+)
 
 # Paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -665,6 +673,25 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def _get_auth_user(self, cursor):
+        """Extract and authenticate user from Authorization: Bearer <token> header."""
+        auth_header = self.headers.get("Authorization", "")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return None
+        token = auth_header.split(" ", 1)[1].strip()
+        try:
+            payload = decode_access_token(token)
+            if payload.get("purpose") == "password_reset":
+                return None
+            username = payload.get("sub")
+            if not username:
+                return None
+            cursor.execute("SELECT * FROM users WHERE username = ?", (username,))
+            user = cursor.fetchone()
+            return dict(user) if user else None
+        except Exception:
+            return None
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -675,8 +702,25 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
         cursor = conn.cursor()
 
         try:
+            auth_user = self._get_auth_user(cursor)
+
+            # 0. User Profile Probe
+            if path == "/api/v1/auth/me":
+                if not auth_user:
+                    self._send_error("Authentication required. Please provide a valid Bearer token.", 401)
+                    return
+                self._send_json({
+                    "id": auth_user["id"],
+                    "username": auth_user["username"],
+                    "email": auth_user["email"],
+                    "full_name": auth_user["full_name"],
+                    "role": auth_user["role"],
+                    "is_active": True
+                })
+                return
+
             # 1. Health Probe
-            if path == "/api/v1/health":
+            elif path == "/api/v1/health":
                 self._send_json({
                     "status": "healthy",
                     "service": "CyberTrace Digital Forensics Engine (NIST / ISO 27037 Compliant)",
@@ -1014,11 +1058,13 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
                 self.wfile.write(body)
 
             # 10. Static Assets & Frontend Serving (Supports Vite Dev/Dist & Standalone)
-            elif path.startswith("/assets/"):
+            elif path.startswith("/assets/") or (FRONTEND_DIR / "dist" / path.lstrip("/")).is_file() or (FRONTEND_DIR / "public" / path.lstrip("/")).is_file():
                 asset_file = FRONTEND_DIR / "dist" / path.lstrip("/")
                 if not asset_file.exists():
+                    asset_file = FRONTEND_DIR / "public" / path.lstrip("/")
+                if not asset_file.exists():
                     asset_file = FRONTEND_DIR / "src" / path.lstrip("/")
-                if asset_file.exists():
+                if asset_file.is_file():
                     ext = asset_file.suffix.lower()
                     mime_types = {
                         ".js": "application/javascript",
@@ -1026,6 +1072,7 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
                         ".svg": "image/svg+xml",
                         ".png": "image/png",
                         ".jpg": "image/jpeg",
+                        ".ico": "image/x-icon",
                         ".woff2": "font/woff2",
                         ".woff": "font/woff"
                     }
@@ -1088,6 +1135,146 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
         cursor = conn.cursor()
 
         try:
+            auth_user = self._get_auth_user(cursor)
+
+            # 0. Authentication Endpoints
+            if path == "/api/v1/auth/register":
+                body = self._read_json_body()
+                username = (body.get("username") or "").strip()
+                email = (body.get("email") or "").strip().lower()
+                password = body.get("password") or ""
+                full_name = (body.get("full_name") or "Forensic Examiner").strip()
+                role_input = (body.get("role") or "Investigator").strip().title()
+                role = role_input if role_input in ("Admin", "Investigator", "Viewer") else "Investigator"
+
+                if not username or not email or not password:
+                    self._send_error("Username, email, and password are required.", 400)
+                    return
+
+                cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
+                if cursor.fetchone():
+                    self._send_error("Username or email is already registered.", 400)
+                    return
+
+                user_id = str(uuid.uuid4())
+                hashed_pw = hash_password(password)
+                created_at = datetime.now(timezone.utc).isoformat()
+                cursor.execute(
+                    "INSERT INTO users (id, username, email, hashed_password, full_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (user_id, username, email, hashed_pw, full_name, role, created_at)
+                )
+                conn.commit()
+
+                token = create_access_token({
+                    "sub": username,
+                    "user_id": user_id,
+                    "role": role,
+                    "email": email
+                })
+                self._send_json({
+                    "access_token": token,
+                    "token_type": "bearer",
+                    "expires_in": 86400,
+                    "user_info": {
+                        "id": user_id,
+                        "username": username,
+                        "email": email,
+                        "full_name": full_name,
+                        "role": role
+                    }
+                }, 201)
+                return
+
+            elif path == "/api/v1/auth/login":
+                body = self._read_json_body()
+                login_id = (body.get("username") or "").strip()
+                password = body.get("password") or ""
+
+                cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (login_id, login_id.lower()))
+                user = cursor.fetchone()
+                if not user or not verify_password(password, user["hashed_password"]):
+                    self._send_error("Invalid investigator credentials. Check your username/email and password.", 401)
+                    return
+
+                token = create_access_token({
+                    "sub": user["username"],
+                    "user_id": user["id"],
+                    "role": user["role"],
+                    "email": user["email"]
+                })
+                self._send_json({
+                    "access_token": token,
+                    "token_type": "bearer",
+                    "expires_in": 86400,
+                    "user_info": {
+                        "id": user["id"],
+                        "username": user["username"],
+                        "email": user["email"],
+                        "full_name": user["full_name"],
+                        "role": user["role"]
+                    }
+                })
+                return
+
+            elif path == "/api/v1/auth/forgot-password":
+                body = self._read_json_body()
+                ident = (body.get("identifier") or body.get("email") or body.get("username") or "").strip()
+                cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (ident, ident.lower()))
+                user = cursor.fetchone()
+                if not user:
+                    self._send_json({
+                        "message": "If an account matches that email/username, a password reset token has been issued.",
+                        "reset_token": None
+                    })
+                    return
+
+                token = create_password_reset_token(user["username"], 15)
+                self._send_json({
+                    "message": f"Password reset token issued for user '{user['username']}'. Token expires in 15 minutes.",
+                    "reset_token": token,
+                    "expires_in_minutes": 15
+                })
+                return
+
+            elif path == "/api/v1/auth/reset-password":
+                body = self._read_json_body()
+                reset_token = (body.get("reset_token") or "").strip()
+                new_pass = body.get("new_password") or ""
+                try:
+                    decoded = decode_password_reset_token(reset_token)
+                    uname = decoded.get("sub")
+                except ValueError as ex:
+                    self._send_error(f"Invalid or expired reset token: {str(ex)}", 400)
+                    return
+
+                cursor.execute("SELECT * FROM users WHERE username = ?", (uname,))
+                user = cursor.fetchone()
+                if not user:
+                    self._send_error("User not found.", 404)
+                    return
+
+                cursor.execute("UPDATE users SET hashed_password = ? WHERE id = ?", (hash_password(new_pass), user["id"]))
+                conn.commit()
+                self._send_json({
+                    "status": "success",
+                    "message": "Password has been successfully updated. You may now log in with your new credentials."
+                })
+                return
+
+            elif path == "/api/v1/auth/logout":
+                self._send_json({
+                    "status": "success",
+                    "message": "Successfully logged out. Client token revoked."
+                })
+                return
+
+            # RBAC Enforcement: Block Viewer role from executing mutation endpoints
+            if auth_user and auth_user.get("role") == "Viewer":
+                viewer_blocked = ["/api/v1/cases", "/api/v1/evidence/upload", "/api/v1/threats/evaluate"]
+                if path in viewer_blocked or path.endswith("/verify") or path.endswith("/tamper"):
+                    self._send_error("Access forbidden: Viewer role has read-only access to CyberTrace investigations.", 403)
+                    return
+
             # 1. Evidence Verification
             if path.startswith("/api/v1/evidence/") and path.endswith("/verify"):
                 ev_id = path.split("/")[4]

@@ -11,7 +11,7 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     full_name = Column(String(100), nullable=True)
-    role = Column(String(30), nullable=False, default="Forensic Analyst")  # Admin, Lead Examiner, Forensic Analyst, Observer
+    role = Column(String(30), nullable=False, default="Investigator")  # Admin, Investigator, Viewer
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
