@@ -276,6 +276,8 @@ def health_check():
         "database_healthy": db_healthy,
         "vault_storage": "Non-Executable Isolated Vault",
         "storage_path": str(settings.DATA_DIR),
+        "persistent_storage_mounted": settings.IS_PERSISTENT_STORAGE,
+        "storage_warning": settings.STORAGE_WARNING,
         "forensic_integrity_mode": "Active (SHA-256 NIST FIPS 180-4)",
         "active_modules": 12
     }

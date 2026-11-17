@@ -18,9 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app
 
 # Create persistent storage directories and assign non-root examiner user
-RUN mkdir -p /app/uploads /app/reports /data && \
+RUN mkdir -p /app/uploads /app/reports /data /var/data && \
     useradd -u 1000 -m -s /bin/bash forensic_user && \
-    chown -R forensic_user:forensic_user /app /data
+    chown -R forensic_user:forensic_user /app /data /var/data
 
 USER forensic_user
 

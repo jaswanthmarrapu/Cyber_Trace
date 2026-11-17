@@ -28,6 +28,8 @@ services:
         value: "sqlite:////var/data/cybertrace.db"
       - key: ADMIN_INITIAL_USERNAME
         value: admin_examiner
+      - key: ADMIN_INITIAL_PASSWORD
+        value: CyberTraceAdmin2026!
     disk:
       name: cybertrace-data
       mountPath: /var/data
