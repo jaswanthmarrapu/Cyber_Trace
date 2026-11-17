@@ -509,20 +509,20 @@ def store_timeline_events(db_path: str, case_id: str, events: List[Dict[str, Any
             severity, record_type, evidence_id, original_record_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            e["id"],
+            e.get("id") or str(uuid.uuid4()),
             case_id,
-            e["event_timestamp"],
-            e["event_source"],
-            e["event_category"],
+            e.get("event_timestamp") or e.get("timestamp") or datetime.now(timezone.utc).isoformat(),
+            e.get("event_source") or e.get("source") or "System Log",
+            e.get("event_category") or e.get("category") or "Forensic Activity",
             e.get("actor"),
             e.get("target"),
-            e["description"],
+            e.get("description", "Forensic timeline marker"),
             e.get("mitre_tactic"),
             e.get("confidence_level", "High"),
             e.get("severity", "Medium"),
             e.get("record_type", "Observed Event"),
-            e.get("evidence_reference", {}).get("evidence_id"),
-            e.get("evidence_reference", {}).get("original_record_id")
+            e.get("evidence_reference", {}).get("evidence_id") if isinstance(e.get("evidence_reference"), dict) else None,
+            e.get("evidence_reference", {}).get("original_record_id") if isinstance(e.get("evidence_reference"), dict) else None
         ))
         count += 1
 

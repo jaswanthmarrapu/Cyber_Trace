@@ -235,12 +235,17 @@ def root():
 @app.get(f"{settings.API_V1_PREFIX}/health", tags=["System"])
 def health_check():
     """System health probe, storage metrics, and integrity mode verification."""
+    from app.database.connection import check_db_health
+    db_healthy = check_db_health()
     return {
-        "status": "healthy",
+        "status": "healthy" if db_healthy else "degraded",
         "service": "CyberTrace Digital Forensics Engine",
         "version": settings.VERSION,
         "database": "SQLite (ACID Compliant)",
+        "database_path": str(settings.SQLITE_DB_PATH),
+        "database_healthy": db_healthy,
         "vault_storage": "Non-Executable Isolated Vault",
+        "storage_path": str(settings.DATA_DIR),
         "forensic_integrity_mode": "Active (SHA-256 NIST FIPS 180-4)",
         "active_modules": 12
     }

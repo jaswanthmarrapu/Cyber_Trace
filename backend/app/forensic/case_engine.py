@@ -413,7 +413,13 @@ def generate_case_summary_dossier(db_path: str, case_id: str) -> Dict[str, Any]:
     actual_id = case_data["id"]
 
     # 1. Attached Evidence
-    cur.execute("SELECT * FROM evidence WHERE case_id = ? ORDER BY upload_timestamp DESC", (actual_id,))
+    try:
+        cur.execute("SELECT * FROM evidence WHERE case_id = ? ORDER BY acquired_at DESC", (actual_id,))
+    except sqlite3.OperationalError:
+        try:
+            cur.execute("SELECT * FROM evidence WHERE case_id = ? ORDER BY upload_timestamp DESC", (actual_id,))
+        except sqlite3.OperationalError:
+            cur.execute("SELECT * FROM evidence WHERE case_id = ?", (actual_id,))
     evidence_list = [dict(r) for r in cur.fetchall()]
 
     # 2. Case Notes

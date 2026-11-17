@@ -92,11 +92,33 @@ from app.utils.security import (
     decode_access_token
 )
 
-# Paths
+# Paths & Database Storage Resolution
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR_ENV = os.getenv("DATA_DIR")
-DATA_DIR = Path(DATA_DIR_ENV).resolve() if DATA_DIR_ENV else BASE_DIR
-DB_PATH = DATA_DIR / "cybertrace.db"
+
+# Database path resolution supporting DATABASE_PATH environment variable
+db_path_env = os.getenv("DATABASE_PATH", "").strip()
+if db_path_env:
+    DB_PATH = Path(db_path_env)
+elif os.getenv("RENDER"):
+    DB_PATH = Path("/var/data/cybertrace.db")
+elif os.getenv("DATA_DIR"):
+    DB_PATH = Path(os.getenv("DATA_DIR")) / "cybertrace.db"
+else:
+    DB_PATH = BASE_DIR / "cybertrace.db"
+
+# Storage directory resolution
+data_dir_env = os.getenv("DATA_DIR", "").strip()
+if data_dir_env:
+    DATA_DIR = Path(data_dir_env)
+elif os.getenv("RENDER"):
+    DATA_DIR = Path("/var/data")
+elif DB_PATH.parent != BASE_DIR and str(DB_PATH.parent) != ".":
+    DATA_DIR = DB_PATH.parent
+else:
+    DATA_DIR = BASE_DIR
+
+# Ensure database directory and isolated vaults exist
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR = DATA_DIR / "uploads"
 REPORTS_DIR = DATA_DIR / "reports"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
@@ -181,8 +203,10 @@ THREAT_RULES = [
 ]
 
 # Database Initialization
-def init_standalone_db():
-    conn = sqlite3.connect(DB_PATH)
+def init_standalone_db(db_path=None):
+    target_path = Path(db_path) if db_path else DB_PATH
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(target_path)
     cursor = conn.cursor()
 
     cursor.executescript("""
