@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 
-export default function DataTable({ columns, data, searchPlaceholder = "Search records...", rowKey = "id" }) {
+export default function DataTable({ columns = [], data = [], searchPlaceholder = "Search records...", rowKey = "id" }) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredData = data.filter((row) => {
+  const safeData = Array.isArray(data) ? data : [];
+  const safeColumns = Array.isArray(columns) ? columns : [];
+
+  const filteredData = safeData.filter((row) => {
     if (!searchTerm) return true;
+    if (!row) return false;
     return Object.values(row).some((val) =>
       String(val).toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -25,7 +29,7 @@ export default function DataTable({ columns, data, searchPlaceholder = "Search r
           />
         </div>
         <div className="text-xs text-slate-400 font-mono">
-          Showing <span className="text-cyan-400">{filteredData.length}</span> of {data.length} records
+          Showing <span className="text-cyan-400">{filteredData.length}</span> of {safeData.length} records
         </div>
       </div>
 
@@ -33,7 +37,7 @@ export default function DataTable({ columns, data, searchPlaceholder = "Search r
         <table className="w-full text-left text-sm">
           <thead className="bg-[#0b1329] text-xs uppercase font-mono tracking-wider text-slate-400 border-b border-slate-800">
             <tr>
-              {columns.map((col, idx) => (
+              {safeColumns.map((col, idx) => (
                 <th key={idx} className="px-5 py-3 font-semibold">
                   {col.header}
                 </th>
@@ -44,7 +48,7 @@ export default function DataTable({ columns, data, searchPlaceholder = "Search r
             {filteredData.length > 0 ? (
               filteredData.map((row, idx) => (
                 <tr key={row[rowKey] || idx} className="hover:bg-slate-800/40 transition-colors">
-                  {columns.map((col, cIdx) => (
+                  {safeColumns.map((col, cIdx) => (
                     <td key={cIdx} className="px-5 py-3 text-slate-300">
                       {col.render ? col.render(row) : row[col.accessor]}
                     </td>
@@ -53,7 +57,7 @@ export default function DataTable({ columns, data, searchPlaceholder = "Search r
               ))
             ) : (
               <tr>
-                <td colSpan={columns.length} className="px-5 py-8 text-center text-slate-500">
+                <td colSpan={safeColumns.length || 1} className="px-5 py-8 text-center text-slate-500">
                   No records found matching criteria
                 </td>
               </tr>

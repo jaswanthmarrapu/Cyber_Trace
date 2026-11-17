@@ -732,7 +732,8 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", target_origin)
         self.send_header("Access-Control-Allow-Credentials", "true")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers")
+        self.send_header("Access-Control-Allow-Headers", "*")
+        self.send_header("Access-Control-Max-Age", "86400")
         self.send_header("Access-Control-Expose-Headers", "Content-Disposition")
 
     def do_OPTIONS(self):

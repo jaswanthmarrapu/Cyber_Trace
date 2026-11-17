@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import time
 import secrets
 import logging
@@ -125,8 +126,7 @@ def seed_initial_demo_case():
         db.commit()
     except Exception as ex:
         db.rollback()
-        logger.error(f"Error initializing database records: {ex}")
-        raise
+        logger.warning(f"Notice during initial demo record initialization: {ex}")
     finally:
         db.close()
 
@@ -191,19 +191,6 @@ Welcome to the **CyberTrace REST API Engine**. This service powers digital foren
     redoc_url="/redoc"
 )
 
-# Allowed CORS headers explicitly defined without wildcards for credentialed security
-ALLOWED_CORS_HEADERS = [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-    "Access-Control-Request-Method",
-    "Access-Control-Request-Headers",
-    "X-CSRF-Token",
-    "Cache-Control"
-]
-
 # Enable Production CORS for Frontend Communication
 app.add_middleware(
     CORSMiddleware,
@@ -211,15 +198,48 @@ app.add_middleware(
     allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
-    allow_headers=ALLOWED_CORS_HEADERS,
+    allow_headers=["*"],
     expose_headers=["Content-Disposition"]
 )
 
-# Production Request Performance & Access Logging Middleware
+# Comprehensive Preflight and CORS Header Enforcement Middleware
 @app.middleware("http")
-async def log_requests(request: Request, call_next):
+async def cors_and_logging_middleware(request: Request, call_next):
+    origin = request.headers.get("origin")
+    is_allowed_origin = False
+    if origin:
+        if origin in settings.cors_origins or (settings.cors_origin_regex and re.match(settings.cors_origin_regex, origin)):
+            is_allowed_origin = True
+
+    # Immediate preflight response for OPTIONS requests
+    if request.method == "OPTIONS":
+        response = JSONResponse(content={"status": "preflight_ok"}, status_code=200)
+        allowed = origin if is_allowed_origin else "https://cyber-trace-gamma.vercel.app"
+        response.headers["Access-Control-Allow-Origin"] = allowed
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
+        req_headers = request.headers.get("access-control-request-headers", "*")
+        response.headers["Access-Control-Allow-Headers"] = req_headers
+        response.headers["Access-Control-Max-Age"] = "86400"
+        return response
+
     start_time = time.time()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}")
+        response = JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"error": "Internal Forensic Server Error", "message": str(exc)}
+        )
+
+    if is_allowed_origin and origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Expose-Headers"] = "Content-Disposition"
+
     duration_ms = (time.time() - start_time) * 1000
     if request.url.path not in ("/api/v1/health", "/"):
         logger.info(

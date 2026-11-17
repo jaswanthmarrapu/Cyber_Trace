@@ -18,11 +18,12 @@ import {
 import StatusBadge from './StatusBadge';
 import { useAuth } from '../context/AuthContext';
 
-export default function Navbar({ activeCase, cases, onSelectCase }) {
+export default function Navbar({ activeCase, cases = [], onSelectCase }) {
   const { user, role, logout } = useAuth();
   const [currentTime, setCurrentTime] = useState('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const safeCases = Array.isArray(cases) ? cases : [];
 
   useEffect(() => {
     const updateTime = () => {
@@ -60,12 +61,12 @@ export default function Navbar({ activeCase, cases, onSelectCase }) {
           <select
             value={activeCase?.id || ''}
             onChange={(e) => {
-              const selected = cases.find((c) => c.id === e.target.value);
+              const selected = safeCases.find((c) => c.id === e.target.value);
               if (selected) onSelectCase(selected);
             }}
             className="bg-slate-900 border border-slate-700/80 rounded-lg text-xs text-cyan-300 px-3 py-1.5 font-mono focus:outline-none focus:border-cyan-500 max-w-xs truncate cursor-pointer"
           >
-            {cases.map((c) => (
+            {safeCases.map((c) => (
               <option key={c.id} value={c.id}>
                 [{c.case_number}] {c.title}
               </option>

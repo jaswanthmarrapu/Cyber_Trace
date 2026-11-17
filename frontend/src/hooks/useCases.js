@@ -12,10 +12,11 @@ export function useCases() {
     try {
       setLoading(true);
       const res = await caseService.getAll();
-      if (res.data && res.data.length > 0) {
-        setCases(res.data);
+      const caseList = res?.data;
+      if (Array.isArray(caseList) && caseList.length > 0) {
+        setCases(caseList);
         if (!activeCase) {
-          setActiveCase(res.data[0]);
+          setActiveCase(caseList[0]);
         }
       } else {
         setCases(mockCases);

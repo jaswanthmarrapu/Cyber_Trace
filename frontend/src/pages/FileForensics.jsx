@@ -140,12 +140,12 @@ export default function FileForensics({ activeCase }) {
               <span className="text-xs font-mono text-red-400 uppercase tracking-wider">Threat Signature Hits</span>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="font-mono text-2xl font-bold text-red-400">
-                  {analysisResult.signature_matches.length}
+                  {(analysisResult.signature_matches || []).length}
                 </span>
                 <span className="text-xs text-slate-500 font-mono">YARA / Heuristic rules</span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                {analysisResult.signature_matches.length > 0
+                {(analysisResult.signature_matches || []).length > 0
                   ? 'Known web shell / C2 malware markers flagged'
                   : 'Clean / No known signature matches'}
               </p>
@@ -153,7 +153,7 @@ export default function FileForensics({ activeCase }) {
           </div>
 
           {/* Signature Rules Hit Card */}
-          {analysisResult.signature_matches.length > 0 && (
+          {(analysisResult.signature_matches || []).length > 0 && (
             <div className="cyber-card p-5 rounded-2xl border border-red-500/40 bg-red-950/10 space-y-3">
               <h3 className="font-semibold text-red-400 flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" />
