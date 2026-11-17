@@ -76,7 +76,14 @@ def register_user(payload: UserRegisterSchema, db: Session = Depends(get_db)):
 @router.post("/login", response_model=TokenResponseSchema)
 def login_user(payload: UserLoginSchema, db: Session = Depends(get_db)):
     """Authenticate investigator and generate signed Bearer access token."""
-    login_id = payload.username.strip()
+    try:
+        login_id = payload.identifier
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e)
+        )
+
     user = db.query(User).filter(
         (func.lower(User.username) == login_id.lower()) |
         (func.lower(User.email) == login_id.lower())
@@ -96,10 +103,11 @@ def login_user(payload: UserLoginSchema, db: Session = Depends(get_db)):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    user_role = normalize_role(user.role)
     token = create_access_token({
         "sub": user.username,
         "user_id": user.id,
-        "role": user.role,
+        "role": user_role,
         "email": user.email
     })
 
@@ -112,7 +120,7 @@ def login_user(payload: UserLoginSchema, db: Session = Depends(get_db)):
             "username": user.username,
             "email": user.email,
             "full_name": user.full_name,
-            "role": user.role
+            "role": user_role
         }
     }
 
@@ -174,7 +182,7 @@ def get_current_user_profile(current_user: User = Depends(get_current_user)):
         "username": current_user.username,
         "email": current_user.email,
         "full_name": current_user.full_name,
-        "role": current_user.role,
+        "role": normalize_role(current_user.role),
         "is_active": current_user.is_active
     }
 

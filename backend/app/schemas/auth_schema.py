@@ -9,8 +9,16 @@ class UserRegisterSchema(BaseModel):
     role: Optional[str] = Field("Investigator", description="Role: Admin, Investigator, or Viewer")
 
 class UserLoginSchema(BaseModel):
-    username: str = Field(..., description="Username or email address")
+    username: Optional[str] = Field(None, description="Username or email address")
+    email: Optional[str] = Field(None, description="Alternative email address input")
     password: str = Field(..., description="Account password")
+
+    @property
+    def identifier(self) -> str:
+        ident = (self.username or self.email or "").strip()
+        if not ident:
+            raise ValueError("Username or email is required for authentication.")
+        return ident
 
 class ForgotPasswordRequestSchema(BaseModel):
     identifier: str = Field(..., description="Registered email address or username")

@@ -47,10 +47,15 @@ api.interceptors.response.use(
     const config = error.config;
 
     // Dual-channel resilience: If a direct cross-origin call to Render encounters a Network Error
-    // on a Vercel deployment (e.g. aggressive browser adblock/CORS shielding), seamlessly retry
+    // on a Vercel deployment (e.g. aggressive browser adblock/CORS shielding, cold start), seamlessly retry
     // through the Vercel edge reverse proxy (/api/v1) before reporting failure.
+    const isNetworkIssue =
+      error.message === 'Network Error' ||
+      error.code === 'ERR_NETWORK' ||
+      error.code === 'ECONNABORTED';
+
     if (
-      error.message === 'Network Error' &&
+      isNetworkIssue &&
       config &&
       !config._isRetry &&
       typeof window !== 'undefined' &&

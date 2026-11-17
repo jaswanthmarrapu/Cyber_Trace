@@ -49,7 +49,10 @@ def init_db():
     """Initialize all database tables automatically without dropping or wiping existing records."""
     db_dir = os.path.dirname(DB_PATH)
     if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+        except OSError as err:
+            logger.warning(f"Notice on database directory creation: {err}")
 
     import app.models  # Ensure models are registered with Base metadata
     Base.metadata.create_all(bind=engine)

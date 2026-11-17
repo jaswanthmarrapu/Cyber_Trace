@@ -17,11 +17,12 @@ from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from sqlalchemy import func
 from app.config import settings
 from app.database.connection import init_db, SessionLocal
 from app.models.case import Case
 from app.models.user import User
-from app.utils.security import hash_password
+from app.utils.security import hash_password, verify_password
 from app.routes import (
     auth_router,
     dashboard_router,
@@ -47,40 +48,65 @@ logging.basicConfig(
 logger = logging.getLogger("cybertrace")
 
 def seed_initial_demo_case():
-    """Seed initial administrator and realistic demo case if database is empty."""
+    """Seed initial role accounts and realistic demo case if database is empty."""
     db = SessionLocal()
     try:
-        # Seed default investigator user with secure password handling
-        if db.query(User).count() == 0:
-            admin_username = settings.ADMIN_INITIAL_USERNAME
-            admin_email = settings.ADMIN_INITIAL_EMAIL
-            admin_password = settings.ADMIN_INITIAL_PASSWORD
+        # Standard CyberTrace role accounts aligned with frontend quick-fill presets
+        admin_pass = settings.ADMIN_INITIAL_PASSWORD.strip() if settings.ADMIN_INITIAL_PASSWORD else "CyberTraceAdmin2026!"
+        default_accounts = [
+            {
+                "username": settings.ADMIN_INITIAL_USERNAME,  # "admin_examiner"
+                "email": settings.ADMIN_INITIAL_EMAIL,        # "admin@cybertrace.local"
+                "alt_email": "examiner@cybertrace.local",
+                "password": admin_pass,
+                "full_name": "Senior Forensic Examiner",
+                "role": "Admin",
+            },
+            {
+                "username": "investigator_examiner",
+                "email": "investigator@cybertrace.local",
+                "alt_email": None,
+                "password": "CyberTraceInvestigator2026!",
+                "full_name": "Investigator Forensic Specialist",
+                "role": "Investigator",
+            },
+            {
+                "username": "viewer_examiner",
+                "email": "viewer@cybertrace.local",
+                "alt_email": None,
+                "password": "CyberTraceViewer2026!",
+                "full_name": "Viewer Forensic Auditor",
+                "role": "Viewer",
+            }
+        ]
 
-            if not admin_password:
-                if settings.ENVIRONMENT == "production":
-                    # In production, never use a static default password
-                    admin_password = secrets.token_urlsafe(16)
-                    logger.warning(
-                        "\n" + "=" * 64 + "\n"
-                        "[CYBERTRACE SECURITY NOTICE - FIRST RUN INITIALIZATION]\n"
-                        f"Admin User: {admin_username}\n"
-                        f"Temporary Password: {admin_password}\n"
-                        "Note: Set ADMIN_INITIAL_PASSWORD in production environment variables.\n"
-                        + "=" * 64
-                    )
-                else:
-                    admin_password = "CyberTrace2026!"
+        for acc in default_accounts:
+            existing = db.query(User).filter(
+                (func.lower(User.username) == acc["username"].lower()) |
+                (func.lower(User.email) == acc["email"].lower()) |
+                (func.lower(User.email) == (acc["alt_email"].lower() if acc.get("alt_email") else ""))
+            ).first()
 
-            default_user = User(
-                username=admin_username,
-                email=admin_email,
-                hashed_password=hash_password(admin_password),
-                full_name="Senior Forensic Examiner",
-                role="Lead Examiner",
-                is_active=True
-            )
-            db.add(default_user)
-            logger.info(f"Initialized administrative investigator account: '{admin_username}'")
+            if not existing:
+                new_user = User(
+                    username=acc["username"],
+                    email=acc["email"],
+                    hashed_password=hash_password(acc["password"]),
+                    full_name=acc["full_name"],
+                    role=acc["role"],
+                    is_active=True
+                )
+                db.add(new_user)
+                logger.info(f"Initialized role account: '{acc['username']}' with role '{acc['role']}'")
+            else:
+                # Normalize legacy/outdated role to standardized RBAC role
+                if existing.role != acc["role"]:
+                    existing.role = acc["role"]
+                    logger.info(f"Normalized role for '{existing.username}' to '{acc['role']}'")
+                # Ensure password matches default or env-configured password
+                if not verify_password(acc["password"], existing.hashed_password):
+                    existing.hashed_password = hash_password(acc["password"])
+                    logger.info(f"Synchronized credentials for role account: '{existing.username}'")
 
         # Seed initial realistic forensic investigation case with valid lifecycle status
         if db.query(Case).count() == 0:
@@ -106,12 +132,16 @@ def seed_initial_demo_case():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Ensure evidence and reports directories exist
+    # Startup: Log environment and storage persistence status
     logger.info(f"Starting CyberTrace Engine v{settings.VERSION} [{settings.ENVIRONMENT.upper()} MODE]")
-    logger.info(f"Storage Vault Path: {settings.UPLOAD_DIR}")
+    logger.info(f"Storage Vault Path: {settings.DATA_DIR} [Persistent Disk Active: {settings.IS_PERSISTENT_STORAGE}]")
     logger.info(f"Database Target: {settings.SQLITE_DB_PATH}")
-    settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    settings.REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    if settings.STORAGE_WARNING:
+        logger.warning(settings.STORAGE_WARNING)
+
+    # Safely create upload and report storage vaults
+    settings.ensure_storage_directories()
+
     # Initialize SQLite tables and seed default case
     init_db()
     seed_initial_demo_case()

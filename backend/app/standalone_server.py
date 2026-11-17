@@ -92,39 +92,64 @@ from app.utils.security import (
     decode_access_token
 )
 
+# Storage & Database Writability Check
+def _is_storage_writable(target_path: Path) -> bool:
+    try:
+        target_path.mkdir(parents=True, exist_ok=True)
+        probe = target_path / f".probe_{os.getpid()}_{uuid.uuid4().hex[:6]}.tmp"
+        probe.write_text("probe", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return True
+    except (OSError, PermissionError):
+        return False
+
 # Paths & Database Storage Resolution
 BASE_DIR = Path(__file__).resolve().parent.parent
+IS_PERSISTENT_STORAGE = False
+STORAGE_WARNING = None
 
-# Database path resolution supporting DATABASE_PATH environment variable
-db_path_env = os.getenv("DATABASE_PATH", "").strip()
-if db_path_env:
-    DB_PATH = Path(db_path_env)
-elif os.getenv("RENDER"):
-    DB_PATH = Path("/var/data/cybertrace.db")
-elif os.getenv("DATA_DIR"):
-    DB_PATH = Path(os.getenv("DATA_DIR")) / "cybertrace.db"
-else:
-    DB_PATH = BASE_DIR / "cybertrace.db"
-
-# Storage directory resolution
+# Candidate paths resolution
+candidate_data_dir = None
 data_dir_env = os.getenv("DATA_DIR", "").strip()
-if data_dir_env:
-    DATA_DIR = Path(data_dir_env)
-elif os.getenv("RENDER"):
-    DATA_DIR = Path("/var/data")
-elif DB_PATH.parent != BASE_DIR and str(DB_PATH.parent) != ".":
-    DATA_DIR = DB_PATH.parent
-else:
-    DATA_DIR = BASE_DIR
+db_path_env = os.getenv("DATABASE_PATH", "").strip()
 
-# Ensure database directory and isolated vaults exist
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+if data_dir_env:
+    candidate_data_dir = Path(data_dir_env)
+elif db_path_env:
+    candidate_data_dir = Path(db_path_env).parent
+elif os.getenv("RENDER"):
+    candidate_data_dir = Path("/var/data")
+
+if candidate_data_dir and _is_storage_writable(candidate_data_dir):
+    DATA_DIR = candidate_data_dir
+    IS_PERSISTENT_STORAGE = True
+    if db_path_env:
+        DB_PATH = Path(db_path_env)
+    else:
+        DB_PATH = DATA_DIR / "cybertrace.db"
+else:
+    if candidate_data_dir:
+        STORAGE_WARNING = (
+            f"Configured storage path '{candidate_data_dir}' is not writable. "
+            f"Falling back to local application directory '{BASE_DIR}'. "
+            "Data and uploads will not persist across service restarts."
+        )
+        print(f"[CyberTrace WARNING] {STORAGE_WARNING}", file=sys.stderr)
+    DATA_DIR = BASE_DIR
+    DB_PATH = BASE_DIR / "cybertrace.db"
+    IS_PERSISTENT_STORAGE = False
+
 UPLOADS_DIR = DATA_DIR / "uploads"
 REPORTS_DIR = DATA_DIR / "reports"
 FRONTEND_DIR = BASE_DIR.parent / "frontend"
 
-UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+def ensure_standalone_storage_dirs():
+    try:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+        REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        print(f"[CyberTrace ERROR] Failed to create storage directories: {e}", file=sys.stderr)
 
 # Forensic Security Constants
 ALLOWED_EXTENSIONS = {
@@ -205,7 +230,10 @@ THREAT_RULES = [
 # Database Initialization
 def init_standalone_db(db_path=None):
     target_path = Path(db_path) if db_path else DB_PATH
-    target_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        pass
     conn = sqlite3.connect(target_path)
     cursor = conn.cursor()
 
@@ -437,6 +465,24 @@ def init_standalone_db(db_path=None):
         if col_n not in t_cols:
             cursor.execute(f"ALTER TABLE timeline_events ADD COLUMN {col_n} {col_d}")
 
+    # Seed or synchronize standard role accounts
+    default_accounts = [
+        ("usr-admin-001", "admin_examiner", "admin@cybertrace.local", "CyberTraceAdmin2026!", "Senior Forensic Examiner", "Admin"),
+        ("usr-inv-001", "investigator_examiner", "investigator@cybertrace.local", "CyberTraceInvestigator2026!", "Investigator Forensic Specialist", "Investigator"),
+        ("usr-view-001", "viewer_examiner", "viewer@cybertrace.local", "CyberTraceViewer2026!", "Viewer Forensic Auditor", "Viewer"),
+    ]
+    for uid, uname, uemail, upass, ufull, urole in default_accounts:
+        cursor.execute("SELECT id, hashed_password FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)", (uname, uemail))
+        existing_row = cursor.fetchone()
+        if not existing_row:
+            cursor.execute(
+                "INSERT INTO users (id, username, email, hashed_password, full_name, role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (uid, uname, uemail, hash_password(upass), ufull, urole, datetime.now(timezone.utc).isoformat())
+            )
+        else:
+            if not verify_password(upass, existing_row[1]):
+                cursor.execute("UPDATE users SET hashed_password = ?, role = ? WHERE id = ?", (hash_password(upass), urole, existing_row[0]))
+
     # Seed Default Case if empty
     cursor.execute("SELECT COUNT(*) FROM cases")
     if cursor.fetchone()[0] == 0:
@@ -464,8 +510,12 @@ def init_standalone_db(db_path=None):
         md5_init = hashlib.md5(dummy_content).hexdigest()
         stored_vault_file = f"{uuid.uuid4().hex}.raw.vault"
         vault_dest = UPLOADS_DIR / stored_vault_file
-        with open(vault_dest, "wb") as f:
-            f.write(dummy_content)
+        try:
+            vault_dest.parent.mkdir(parents=True, exist_ok=True)
+            with open(vault_dest, "wb") as f:
+                f.write(dummy_content)
+        except OSError:
+            pass
 
         ev_id = "evd-001"
         cursor.execute("""
@@ -1544,6 +1594,7 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
                 # UUID-randomized name + .vault extension prevents execution
                 stored_name = f"{uuid.uuid4().hex}.{ext}.vault"
                 dest_path = UPLOADS_DIR / stored_name
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(dest_path, "wb") as f:
                     f.write(file_content)
                 # Apply read-only permissions (chmod 0400 equivalent on Unix)
@@ -2061,9 +2112,13 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
             conn.close()
 
 def run_server(port=8000):
+    ensure_standalone_storage_dirs()
+    init_standalone_db()
     server_address = ("127.0.0.1", port)
     httpd = HTTPServer(server_address, CyberTraceHandler)
     print(f"CyberTrace Standalone Forensic Server running at http://127.0.0.1:{port}")
+    if STORAGE_WARNING:
+        print(f"[CyberTrace Storage Notice] {STORAGE_WARNING}")
     httpd.serve_forever()
 
 if __name__ == "__main__":

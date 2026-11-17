@@ -17,6 +17,7 @@ import uuid
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 # Ensure backend root on sys.path
@@ -25,7 +26,16 @@ if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
 from app.standalone_server import init_standalone_db
-from app.config import Settings, _resolve_sqlite_db_path, _resolve_database_url, _resolve_data_dir, BASE_DIR
+from app.config import (
+    Settings,
+    _resolve_sqlite_db_path,
+    _resolve_database_url,
+    _resolve_data_dir,
+    _resolve_storage_and_database,
+    is_storage_path_writable,
+    BASE_DIR
+)
+from app.utils.file_security import get_uploads_dir, get_reports_dir, generate_secure_storage_path
 from app.utils.security import hash_password, verify_password, create_access_token, decode_access_token
 from app.forensic.case_engine import (
     create_investigation_case,
@@ -71,39 +81,42 @@ class TestDatabasePersistence(unittest.TestCase):
         self.assertIn("cybertrace.db", db_url)
 
     def test_02_database_path_env_override(self):
-        """Verify explicit DATABASE_PATH environment variable overrides all defaults."""
+        """Verify explicit DATABASE_PATH environment variable overrides all defaults when writable."""
         custom_target = "/custom/mounted/forensics/vault.db"
         os.environ["DATABASE_PATH"] = custom_target
 
-        resolved = _resolve_sqlite_db_path()
-        self.assertEqual(str(resolved), str(Path(custom_target)))
+        with patch("app.config.is_storage_path_writable", return_value=True):
+            resolved = _resolve_sqlite_db_path()
+            self.assertEqual(str(resolved), str(Path(custom_target)))
 
-        db_url = _resolve_database_url(resolved)
-        self.assertIn("vault.db", db_url)
+            db_url = _resolve_database_url(resolved)
+            self.assertIn("vault.db", db_url)
 
     def test_03_render_cloud_persistent_disk_default(self):
-        """Verify Render environment (RENDER=true) defaults to /var/data/cybertrace.db."""
+        """Verify Render environment (RENDER=true) defaults to /var/data/cybertrace.db when mounted."""
         os.environ.pop("DATABASE_PATH", None)
         os.environ["RENDER"] = "true"
 
-        resolved = _resolve_sqlite_db_path()
-        self.assertEqual(str(resolved), str(Path("/var/data/cybertrace.db")))
+        with patch("app.config.is_storage_path_writable", return_value=True):
+            resolved = _resolve_sqlite_db_path()
+            self.assertEqual(str(resolved), str(Path("/var/data/cybertrace.db")))
 
-        data_dir = _resolve_data_dir(resolved)
-        self.assertEqual(str(data_dir), str(Path("/var/data")))
+            data_dir = _resolve_data_dir(resolved)
+            self.assertEqual(str(data_dir), str(Path("/var/data")))
 
-        db_url = _resolve_database_url(resolved)
-        self.assertEqual(db_url, "sqlite:////var/data/cybertrace.db")
+            db_url = _resolve_database_url(resolved)
+            self.assertEqual(db_url, "sqlite:////var/data/cybertrace.db")
 
     def test_04_data_dir_env_path_resolution(self):
-        """Verify DATA_DIR environment variable resolves to DATA_DIR / cybertrace.db."""
+        """Verify DATA_DIR environment variable resolves to DATA_DIR / cybertrace.db when writable."""
         os.environ.pop("DATABASE_PATH", None)
         os.environ.pop("RENDER", None)
         os.environ["DATA_DIR"] = "/mnt/forensic_volume"
 
-        resolved = _resolve_sqlite_db_path()
-        expected = Path("/mnt/forensic_volume/cybertrace.db")
-        self.assertEqual(str(resolved), str(expected))
+        with patch("app.config.is_storage_path_writable", return_value=True):
+            resolved = _resolve_sqlite_db_path()
+            expected = Path("/mnt/forensic_volume/cybertrace.db")
+            self.assertEqual(str(resolved), str(expected))
 
     def test_05_dynamic_settings_property_responsiveness(self):
         """Verify Settings properties dynamically adapt when DATABASE_PATH changes at runtime."""
@@ -111,8 +124,9 @@ class TestDatabasePersistence(unittest.TestCase):
         test_db_file = f"/tmp/test_audit_{uuid.uuid4().hex[:6]}.db"
         os.environ["DATABASE_PATH"] = test_db_file
 
-        self.assertEqual(str(settings.SQLITE_DB_PATH), str(Path(test_db_file)))
-        self.assertIn(test_db_file.replace("\\", "/"), settings.DATABASE_URL)
+        with patch("app.config.is_storage_path_writable", return_value=True):
+            self.assertEqual(str(settings.SQLITE_DB_PATH), str(Path(test_db_file)))
+            self.assertIn(test_db_file.replace("\\", "/"), settings.DATABASE_URL)
 
     def test_06_database_creation_and_non_destructive_startup(self):
         """Verify tables are initialized on a new path without resetting existing examiner records."""
@@ -229,6 +243,45 @@ class TestDatabasePersistence(unittest.TestCase):
         payload = decode_access_token(token)
         self.assertEqual(payload["sub"], "persisted_admin")
         self.assertEqual(payload["role"], "Admin")
+
+    def test_09_unwritable_storage_graceful_fallback(self):
+        """
+        Verify that if /var/data or DATABASE_PATH is NOT writable (e.g. persistent disk not attached),
+        the backend does NOT crash, gracefully falls back to local application directory,
+        sets IS_PERSISTENT_STORAGE=False, and emits STORAGE_WARNING.
+        """
+        os.environ["RENDER"] = "true"
+        os.environ.pop("DATABASE_PATH", None)
+
+        with patch("app.config.is_storage_path_writable", return_value=False):
+            db_path, data_dir, is_persistent, warning = _resolve_storage_and_database()
+            self.assertEqual(db_path, BASE_DIR / "cybertrace.db")
+            self.assertEqual(data_dir, BASE_DIR)
+            self.assertFalse(is_persistent)
+            self.assertIsNotNone(warning)
+            self.assertIn("not writable", warning)
+
+            settings = Settings()
+            self.assertEqual(settings.SQLITE_DB_PATH, BASE_DIR / "cybertrace.db")
+            self.assertFalse(settings.IS_PERSISTENT_STORAGE)
+            self.assertIsNotNone(settings.STORAGE_WARNING)
+
+    def test_10_safe_directory_creation_and_file_security(self):
+        """
+        Verify that file_security helpers dynamically resolve upload directory
+        without requiring module-level mkdir calls that crash worker startup.
+        """
+        uploads_dir = get_uploads_dir()
+        self.assertTrue(uploads_dir.exists())
+        self.assertTrue(uploads_dir.is_dir())
+
+        reports_dir = get_reports_dir()
+        self.assertTrue(reports_dir.exists())
+        self.assertTrue(reports_dir.is_dir())
+
+        stored_name, secure_path = generate_secure_storage_path("malware_test.exe")
+        self.assertTrue(stored_name.endswith(".exe.vault"))
+        self.assertEqual(secure_path.parent, uploads_dir)
 
 
 if __name__ == "__main__":
