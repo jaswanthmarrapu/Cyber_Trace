@@ -1,0 +1,10 @@
+CyberTrace Forensic Platform - Standard Operating Procedure
+Document Version: 1.0
+Classification: UNCLASSIFIED / FOR OFFICIAL USE ONLY
+
+1. Evidence Preservation:
+Always compute SHA-256 immediately upon acquisition of digital media. Maintain chain-of-custody transfer logs.
+
+2. Integrity Verification:
+Perform periodic recalculations of cryptographic checksums before and after analysis stages.
+

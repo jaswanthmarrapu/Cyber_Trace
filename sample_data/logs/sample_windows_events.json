@@ -1,0 +1,31 @@
+[
+  {
+    "EventID": 4624,
+    "TimeCreated": "2026-11-12T09:15:30Z",
+    "Computer": "CORP-DC01.forensic.local",
+    "Message": "An account was successfully logged on. Account Name: svc_backup, Logon Type: 3 (Network), Source Network Address: 198.51.100.23",
+    "Severity": "Information"
+  },
+  {
+    "EventID": 4672,
+    "TimeCreated": "2026-11-12T09:15:31Z",
+    "Computer": "CORP-DC01.forensic.local",
+    "Message": "Special privileges assigned to new logon. Account Name: svc_backup, Assigned: SeSecurityPrivilege, SeBackupPrivilege",
+    "Severity": "Warning"
+  },
+  {
+    "EventID": 7045,
+    "TimeCreated": "2026-11-12T09:16:02Z",
+    "Computer": "CORP-DC01.forensic.local",
+    "Message": "A new service was installed in the system. Service Name: PSService, Service File Name: C:\\Windows\\Temp\\srvmgr.exe",
+    "Severity": "Critical"
+  },
+  {
+    "EventID": 1102,
+    "TimeCreated": "2026-11-12T09:18:40Z",
+    "Computer": "CORP-DC01.forensic.local",
+    "Message": "The audit log was cleared. SubjectUserSid: S-1-5-21-382910-500",
+    "Severity": "Critical"
+  }
+]
+

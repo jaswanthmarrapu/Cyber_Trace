@@ -1,0 +1,11 @@
+Nov 12 04:12:01 forensic-srv sshd[14201]: Failed password for root from 198.51.100.23 port 45212 ssh2
+Nov 12 04:12:04 forensic-srv sshd[14205]: Failed password for root from 198.51.100.23 port 45214 ssh2
+Nov 12 04:12:07 forensic-srv sshd[14210]: Failed password for root from 198.51.100.23 port 45216 ssh2
+Nov 12 04:12:10 forensic-srv sshd[14215]: Failed password for admin from 198.51.100.23 port 45220 ssh2
+Nov 12 04:12:13 forensic-srv sshd[14221]: Failed password for ubuntu from 198.51.100.23 port 45224 ssh2
+Nov 12 04:12:18 forensic-srv sshd[14228]: Accepted password for deployer from 198.51.100.23 port 45230 ssh2
+Nov 12 04:13:02 forensic-srv sudo: deployer : TTY=pts/0 ; PWD=/home/deployer ; USER=root ; COMMAND=/bin/bash
+Nov 12 04:13:45 forensic-srv useradd[14300]: new user: name=backdoor, UID=0, GID=0, home=/root, shell=/bin/bash
+Nov 12 04:14:10 forensic-srv systemd[1]: Stopped Daily apt download activities.
+Nov 12 04:15:22 forensic-srv sshd[14350]: Received disconnect from 198.51.100.23 port 45230:11: User disconnected
+

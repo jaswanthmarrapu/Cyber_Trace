@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: cybertrace-api
+    runtime: python
+    region: oregon
+    plan: starter
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 2 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT app.main:app
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: SECRET_KEY
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "https://*.vercel.app,http://localhost:5173,http://localhost:5174"
+      - key: CORS_ORIGIN_REGEX
+        value: "^https://.*\\.vercel\\.app$"
+      - key: DATA_DIR
+        value: "/var/data"
+      - key: ADMIN_INITIAL_USERNAME
+        value: admin_examiner
+    disk:
+      name: cybertrace-data
+      mountPath: /var/data
+      sizeGB: 1

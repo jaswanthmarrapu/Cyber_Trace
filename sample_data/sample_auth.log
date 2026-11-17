@@ -1,0 +1,13 @@
+Mar 14 02:14:01 srv-prod-db sshd[18402]: Failed password for invalid user admin from 185.220.101.5 port 49152 ssh2
+Mar 14 02:14:03 srv-prod-db sshd[18405]: Failed password for invalid user root from 185.220.101.5 port 49154 ssh2
+Mar 14 02:14:07 srv-prod-db sshd[18408]: Failed password for invalid user oracle from 185.220.101.5 port 49156 ssh2
+Mar 14 02:14:12 srv-prod-db sshd[18412]: Failed password for invalid user test from 185.220.101.5 port 49158 ssh2
+Mar 14 02:14:18 srv-prod-db sshd[18415]: Failed password for invalid user postgres from 185.220.101.5 port 49160 ssh2
+Mar 14 02:14:25 srv-prod-db sshd[18420]: Failed password for deploy from 185.220.101.5 port 49164 ssh2
+Mar 14 02:14:31 srv-prod-db sshd[18423]: Accepted password for deploy from 185.220.101.5 port 49166 ssh2
+Mar 14 02:14:32 srv-prod-db systemd-logind[782]: New session 42 of user deploy.
+Mar 14 02:15:10 srv-prod-db sudo:   deploy : TTY=pts/1 ; PWD=/home/deploy ; USER=root ; COMMAND=/bin/cat /etc/shadow
+Mar 14 02:15:11 srv-prod-db sudo: pam_unix(sudo:auth): authentication failure; logname=deploy uid=1001 euid=0 tty=/dev/pts/1 ruser=deploy rhost= user=deploy
+Mar 14 02:16:04 srv-prod-db sudo:   deploy : TTY=pts/1 ; PWD=/tmp ; USER=root ; COMMAND=/usr/bin/python3 -c import pty; pty.spawn("/bin/bash")
+Mar 14 02:16:45 srv-prod-db sshd[18510]: Received disconnect from 185.220.101.5 port 49166:11: User closed connection
+

