@@ -89,7 +89,10 @@ export function AuthProvider({ children }) {
       setUser(user_info);
       return { success: true, user: user_info };
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Login failed. Please check your credentials.';
+      let msg = err.response?.data?.detail || err.message || 'Login failed. Please check your credentials.';
+      if (err.message === 'Network Error') {
+        msg = 'Network Error: Cannot connect to forensic API (https://cyber-trace-2htc.onrender.com). If the backend is waking from sleep, please wait 30 seconds and retry.';
+      }
       setAuthError(msg);
       return { success: false, error: msg };
     } finally {
@@ -109,7 +112,10 @@ export function AuthProvider({ children }) {
       setUser(user_info);
       return { success: true, user: user_info };
     } catch (err) {
-      const msg = err.response?.data?.detail || err.message || 'Registration failed.';
+      let msg = err.response?.data?.detail || err.message || 'Registration failed.';
+      if (err.message === 'Network Error') {
+        msg = 'Network Error: Cannot connect to forensic API (https://cyber-trace-2htc.onrender.com). If the backend is waking from sleep, please wait 30 seconds and retry.';
+      }
       setAuthError(msg);
       return { success: false, error: msg };
     } finally {

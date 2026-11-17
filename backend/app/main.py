@@ -161,14 +161,27 @@ Welcome to the **CyberTrace REST API Engine**. This service powers digital foren
     redoc_url="/redoc"
 )
 
+# Allowed CORS headers explicitly defined without wildcards for credentialed security
+ALLOWED_CORS_HEADERS = [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+    "Access-Control-Request-Method",
+    "Access-Control-Request-Headers",
+    "X-CSRF-Token",
+    "Cache-Control"
+]
+
 # Enable Production CORS for Frontend Communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    allow_headers=ALLOWED_CORS_HEADERS,
     expose_headers=["Content-Disposition"]
 )
 

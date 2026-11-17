@@ -97,6 +97,41 @@ def dispatch_request(method: str, path: str, body: dict = None, headers: dict = 
     return status_code, json_data
 
 
+def dispatch_request_raw(method: str, path: str, body: dict = None, headers: dict = None):
+    """Helper to dispatch HTTP request and return parsed response headers."""
+    hdrs = headers or {}
+    raw_body = json.dumps(body).encode("utf-8") if body else b""
+
+    hdr_lines = [
+        f"{method} {path} HTTP/1.1",
+        "Host: 127.0.0.1:8000",
+        f"Content-Length: {len(raw_body)}"
+    ]
+    if body:
+        hdr_lines.append("Content-Type: application/json")
+    for k, v in hdrs.items():
+        hdr_lines.append(f"{k}: {v}")
+    hdr_lines.append("")
+    hdr_lines.append("")
+
+    request_bytes = "\r\n".join(hdr_lines).encode("utf-8") + raw_body
+    sock = MockSocket(request_bytes)
+    CyberTraceHandler(sock, ("127.0.0.1", 54321), Mock())
+
+    raw_response = sock.output.decode("utf-8", errors="replace")
+    parts = raw_response.split("\r\n\r\n", 1)
+    header_block = parts[0]
+    status_code = int(header_block.split("\r\n")[0].split(" ")[1])
+
+    res_headers = {}
+    for line in header_block.split("\r\n")[1:]:
+        if ":" in line:
+            hk, hv = line.split(":", 1)
+            res_headers[hk.strip().lower()] = hv.strip()
+
+    return status_code, res_headers, raw_response
+
+
 class TestAuthenticationAndRBAC(unittest.TestCase):
 
     @classmethod
@@ -291,6 +326,25 @@ class TestAuthenticationAndRBAC(unittest.TestCase):
         self.assertEqual(status_code, 200)
         self.assertIn("access_token", login_res)
         self.assertEqual(login_res["user_info"]["username"], f"adm_{self.test_run_id}")
+
+    def test_14_cors_preflight_and_credentials_compliance(self):
+        """Test CORS OPTIONS preflight returns exact origin, credentials true, and no wildcard headers."""
+        target_origin = "https://cyber-trace-gamma.vercel.app"
+        status_code, headers, _ = dispatch_request_raw(
+            "OPTIONS",
+            "/api/v1/auth/login",
+            headers={
+                "Origin": target_origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "content-type"
+            }
+        )
+        self.assertEqual(status_code, 204)
+        self.assertEqual(headers.get("access-control-allow-origin"), target_origin)
+        self.assertNotEqual(headers.get("access-control-allow-origin"), "*")
+        self.assertEqual(headers.get("access-control-allow-credentials"), "true")
+        self.assertIn("content-type", headers.get("access-control-allow-headers", "").lower())
+        self.assertNotIn("*", headers.get("access-control-allow-headers", ""))
 
 
 if __name__ == "__main__":

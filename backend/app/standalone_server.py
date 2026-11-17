@@ -636,9 +636,30 @@ def scan_threat_signatures(data_bytes: bytes, text_content: str = None) -> list:
 # HTTP Request Handler
 class CyberTraceHandler(BaseHTTPRequestHandler):
     def _send_cors_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        origin = self.headers.get("Origin", "") if hasattr(self, "headers") and self.headers else ""
+        allowed_origins = [
+            "https://cyber-trace-gamma.vercel.app",
+            "https://cyber-trace-2htc.onrender.com",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000"
+        ]
+        target_origin = "https://cyber-trace-gamma.vercel.app"
+        if origin in allowed_origins:
+            target_origin = origin
+        elif origin and (origin.endswith(".vercel.app") or origin.endswith(".onrender.com")):
+            target_origin = origin
+
+        self.send_header("Access-Control-Allow-Origin", target_origin)
+        self.send_header("Access-Control-Allow-Credentials", "true")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, Accept, Origin, Access-Control-Request-Method, Access-Control-Request-Headers")
+        self.send_header("Access-Control-Expose-Headers", "Content-Disposition")
 
     def do_OPTIONS(self):
         self.send_response(204)

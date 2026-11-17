@@ -43,7 +43,27 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+
+    // Dual-channel resilience: If a direct cross-origin call to Render encounters a Network Error
+    // on a Vercel deployment (e.g. aggressive browser adblock/CORS shielding), seamlessly retry
+    // through the Vercel edge reverse proxy (/api/v1) before reporting failure.
+    if (
+      error.message === 'Network Error' &&
+      config &&
+      !config._isRetry &&
+      typeof window !== 'undefined' &&
+      window.location.hostname.includes('vercel.app') &&
+      config.baseURL &&
+      config.baseURL.includes('onrender.com')
+    ) {
+      config._isRetry = true;
+      console.warn('[CyberTrace API]: Direct Render CORS connection blocked or sleeping. Retrying seamlessly via Vercel Reverse Proxy...');
+      config.baseURL = '/api/v1';
+      return api(config);
+    }
+
     const status = error.response?.status;
     const url = error.config?.url || '';
 
