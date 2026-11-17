@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.database.connection import get_db
 from app.models.user import User
 from app.schemas.auth_schema import (
@@ -24,9 +25,10 @@ router = APIRouter(prefix="/auth", tags=["Authentication & Access Control"])
 @router.post("/register", response_model=TokenResponseSchema, status_code=status.HTTP_201_CREATED)
 def register_user(payload: UserRegisterSchema, db: Session = Depends(get_db)):
     """Enroll a new forensic investigator with cryptographic credentials."""
-    # Check if username or email already exists
+    # Check if username or email already exists (case-insensitive)
     existing_user = db.query(User).filter(
-        (User.username == payload.username.strip()) | (User.email == payload.email.strip().lower())
+        (func.lower(User.username) == payload.username.strip().lower()) |
+        (func.lower(User.email) == payload.email.strip().lower())
     ).first()
     if existing_user:
         raise HTTPException(
@@ -76,7 +78,8 @@ def login_user(payload: UserLoginSchema, db: Session = Depends(get_db)):
     """Authenticate investigator and generate signed Bearer access token."""
     login_id = payload.username.strip()
     user = db.query(User).filter(
-        (User.username == login_id) | (User.email == login_id.lower())
+        (func.lower(User.username) == login_id.lower()) |
+        (func.lower(User.email) == login_id.lower())
     ).first()
 
     if not user or not verify_password(payload.password, user.hashed_password):
@@ -118,7 +121,8 @@ def forgot_password(payload: ForgotPasswordRequestSchema, db: Session = Depends(
     """Generate a time-limited password reset token for account recovery."""
     target_id = payload.identifier.strip()
     user = db.query(User).filter(
-        (User.username == target_id) | (User.email == target_id.lower())
+        (func.lower(User.username) == target_id.lower()) |
+        (func.lower(User.email) == target_id.lower())
     ).first()
 
     if not user:

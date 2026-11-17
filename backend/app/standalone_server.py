@@ -1151,7 +1151,7 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
                     self._send_error("Username, email, and password are required.", 400)
                     return
 
-                cursor.execute("SELECT id FROM users WHERE username = ? OR email = ?", (username, email))
+                cursor.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)", (username, email))
                 if cursor.fetchone():
                     self._send_error("Username or email is already registered.", 400)
                     return
@@ -1190,7 +1190,7 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
                 login_id = (body.get("username") or "").strip()
                 password = body.get("password") or ""
 
-                cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (login_id, login_id.lower()))
+                cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)", (login_id, login_id))
                 user = cursor.fetchone()
                 if not user or not verify_password(password, user["hashed_password"]):
                     self._send_error("Invalid investigator credentials. Check your username/email and password.", 401)
@@ -1219,7 +1219,7 @@ class CyberTraceHandler(BaseHTTPRequestHandler):
             elif path == "/api/v1/auth/forgot-password":
                 body = self._read_json_body()
                 ident = (body.get("identifier") or body.get("email") or body.get("username") or "").strip()
-                cursor.execute("SELECT * FROM users WHERE username = ? OR email = ?", (ident, ident.lower()))
+                cursor.execute("SELECT * FROM users WHERE LOWER(username) = LOWER(?) OR LOWER(email) = LOWER(?)", (ident, ident))
                 user = cursor.fetchone()
                 if not user:
                     self._send_json({

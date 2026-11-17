@@ -60,6 +60,8 @@ class Settings:
             "http://127.0.0.1:3000",
             "http://localhost:8000",
             "http://127.0.0.1:8000",
+            "https://cyber-trace-gamma.vercel.app",
+            "https://cyber-trace-2htc.onrender.com",
         ]
         custom_origins = os.getenv("CORS_ORIGINS", "")
         if custom_origins:
@@ -72,7 +74,11 @@ class Settings:
     @property
     def cors_origin_regex(self) -> str:
         # Regex matching Vercel preview and production deployments
-        return os.getenv("CORS_ORIGIN_REGEX", r"^https:\/\/.*\.vercel\.app$")
+        regex_env = os.getenv("CORS_ORIGIN_REGEX", "")
+        if regex_env:
+            # Normalize double backslashes that can occur in YAML or shell environment exports
+            return regex_env.replace(r"\\.", r"\.")
+        return r"^https://.*\.vercel\.app$"
 
 settings = Settings()
 

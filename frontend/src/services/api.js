@@ -1,16 +1,32 @@
 import axios from 'axios';
 
-// In production (Vercel deployment), VITE_API_URL points to the Render backend (e.g. https://cybertrace-api.onrender.com/api/v1)
+// In production (Vercel deployment), VITE_API_URL points to the Render backend (e.g. https://cyber-trace-2htc.onrender.com/api/v1)
 // In local development or proxy mode, it seamlessly defaults to '/api/v1'
-const rawBaseUrl = import.meta.env.VITE_API_URL || '/api/v1';
-const baseURL = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+let rawBaseUrl = (import.meta.env.VITE_API_URL || '').trim();
+
+// Fallback/auto-detect if missing or pointing to outdated placeholder domain
+if (!rawBaseUrl || rawBaseUrl.includes('cybertrace-api.onrender.com')) {
+  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+    rawBaseUrl = 'https://cyber-trace-2htc.onrender.com/api/v1';
+  } else {
+    rawBaseUrl = '/api/v1';
+  }
+}
+
+// Strip any trailing slashes
+let baseURL = rawBaseUrl.replace(/\/+$/, '');
+
+// Ensure /api/v1 path suffix is present if a bare host domain was supplied
+if (baseURL.startsWith('http') && !baseURL.endsWith('/api/v1')) {
+  baseURL = `${baseURL}/api/v1`;
+}
 
 const api = axios.create({
   baseURL: baseURL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+  timeout: 60000, // 60s timeout accommodates Render free-tier cold-start wakeups
 });
 
 // Attach JWT Bearer Token to all outgoing requests

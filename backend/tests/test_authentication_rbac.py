@@ -282,6 +282,16 @@ class TestAuthenticationAndRBAC(unittest.TestCase):
         self.assertEqual(status_code, 200)
         self.assertEqual(data.get("status"), "success")
 
+    def test_13_case_insensitive_login(self):
+        """Test that login succeeds regardless of username casing (e.g., ADM vs adm)."""
+        status_code, login_res = dispatch_request("POST", "/api/v1/auth/login", {
+            "username": f"ADM_{self.test_run_id}".upper(),
+            "password": "SecureAdminPassword2026!"
+        })
+        self.assertEqual(status_code, 200)
+        self.assertIn("access_token", login_res)
+        self.assertEqual(login_res["user_info"]["username"], f"adm_{self.test_run_id}")
+
 
 if __name__ == "__main__":
     unittest.main()
